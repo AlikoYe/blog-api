@@ -1,0 +1,1 @@
+Blog API-ға қош келдіңіз, {{ user.first_name }}!

@@ -1,18 +1,22 @@
 from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
+from django.utils.translation import gettext_lazy as _
 
-REGISTER_RATE = '5/minute'
-LOGIN_RATE = '10/minute'
-POST_CREATION_RATE = '20/minute'
-THROTTLE_MESSAGE = 'Too many requests, try again later'
+REGISTER_RATE = "5/minute"
+LOGIN_RATE = "10/minute"
+POST_CREATION_RATE = "20/minute"
+THROTTLE_MESSAGE = _("Too many requests, try again later")
+
 
 class RegisterThrottle(AnonRateThrottle):
     rate = REGISTER_RATE
-    scope = 'register'
+    scope = "register"
+
 
 class LoginThrottle(AnonRateThrottle):
     rate = LOGIN_RATE
-    scope = 'login'
+    scope = "login"
+
 
 class PostCreationThrottle(UserRateThrottle):
     rate = POST_CREATION_RATE
-    scope = 'post_creation'
+    scope = "post_creation"

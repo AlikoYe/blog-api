@@ -22,4 +22,5 @@ db.sqlite3
 media/
 
 .DS_Store
-Thumbs.db
+Thumbs.db*.mo
+staticfiles/

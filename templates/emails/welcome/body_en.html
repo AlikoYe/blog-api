@@ -1,0 +1,18 @@
+<p>Hello {{ user.first_name }} {{ user.last_name }},</p>
+
+<p>Welcome to Blog API! Your account has been created successfully.</p>
+
+<p>Here's what you can do:</p>
+<ul>
+    <li>Create and publish blog posts</li>
+    <li>Comment on other posts</li>
+    <li>Customize your language and timezone preferences</li>
+</ul>
+
+<p>Your account details:</p>
+<ul>
+    <li>Email: {{ user.email }}</li>
+    <li>Language: {{ user.get_language_display }}</li>
+</ul>
+
+<p>Best regards,<br>Blog API Team</p>
