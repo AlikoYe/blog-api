@@ -73,6 +73,7 @@ class PostSerializer(serializers.ModelSerializer):
             "tags",
             "tag_ids",
             "status",
+            "publish_at",
             "comments_count",
             "created_at",
             "updated_at",

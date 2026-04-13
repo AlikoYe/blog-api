@@ -17,3 +17,12 @@ BLOG_ALLOWED_HOSTS = config(
     default="localhost,127.0.0.1",
     cast=lambda v: [s.strip() for s in v.split(",")],
 )
+
+BLOG_CELERY_BROKER_URL = env_config(
+    "BLOG_CELERY_BROKER_URL",
+    default="redis://localhost:6379/1",
+)
+
+BLOG_FLOWER_USER = env_config("BLOG_FLOWER_USER", default="admin")
+BLOG_FLOWER_PASSWORD = env_config("BLOG_FLOWER_PASSWORD", default="changeme")
+BLOG_SEED_DB = env_config("BLOG_SEED_DB", default="false")

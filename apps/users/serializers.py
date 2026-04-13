@@ -5,7 +5,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils.translation import gettext_lazy as _
 from apps.users.models import LANGUAGE_CHOICES, TIMEZONE_MAX_LENGTH
 from apps.users.models import User
-from apps.users.services import send_welcome_email
+from apps.users.tasks import send_welcome_email_task
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ class RegisterSerializer(serializers.Serializer):
             language=language,
         )
         logger.info("User registered via serializer: %s", user.email)
-        send_welcome_email(user)
+        send_welcome_email_task.delay(user.id)
         return user
 
     def get_tokens(self, user: User) -> dict:

@@ -24,3 +24,4 @@ media/
 .DS_Store
 Thumbs.db*.mo
 staticfiles/
+settings/.env.docker

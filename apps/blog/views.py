@@ -1,4 +1,6 @@
 import logging
+import json
+import redis as sync_redis
 from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
 from apps.users.throttles import PostCreationThrottle
 from django.core.cache import cache
@@ -12,12 +14,33 @@ from apps.blog.models import Post
 from apps.blog.permissions import IsOwnerOrReadOnly
 from apps.blog.serializers import CommentSerializer, PostSerializer
 from apps.blog.services import publish_comment_event
+from settings.conf import BLOG_REDIS_URL
 
 logger = logging.getLogger(__name__)
 
 POSTS_CACHE_KEY_PREFIX = "posts_list"
 POSTS_CACHE_TTL = 60
 SUPPORTED_LANGUAGES = ("en", "ru", "kk")
+
+
+def _publish_post_sse_event(post) -> None:
+    from apps.blog.sse import SSE_CHANNEL
+
+    event_data = json.dumps(
+        {
+            "post_id": post.id,
+            "title": post.title,
+            "slug": post.slug,
+            "author": {"id": post.author.id, "email": post.author.email},
+            "published_at": post.updated_at.isoformat(),
+        }
+    )
+    try:
+        client = sync_redis.from_url(BLOG_REDIS_URL)
+        client.publish(SSE_CHANNEL, event_data)
+        logger.info("SSe event published for post %s", post.slug)
+    except Exception:
+        logger.exception("SSe event published for post %s", post.slug)
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -112,24 +135,31 @@ class PostViewSet(viewsets.ModelViewSet):
         return super().create(request, *args, **kwargs)
 
     def _invalidate_posts_cache(self) -> None:
-        for lang in SUPPORTED_LANGUAGES:
-            cache.delete(f"{POSTS_CACHE_KEY_PREFIX}_{lang}")
-        logger.debug("Posts cache invalidated for all languages")
+        invalidate_posts_cache_task.delay()
+        logger.debug("Posts cache invalidation dispatched to Celery")
 
     def perform_create(self, serializer: PostSerializer) -> None:
         try:
             post = serializer.save(author=self.request.user)
             self._invalidate_posts_cache()
             logger.info('Post created: "%s" by %s', post.slug, self.request.user.email)
+            if post.status == Post.Status.PUBLISHED:
+                _publish_post_sse_event(post)
         except Exception:
             logger.exception("Post creation failed by %s", self.request.user.email)
             raise
 
     def perform_update(self, serializer: PostSerializer) -> None:
         try:
+            old_status = serializer.instance.status
             post = serializer.save()
             self._invalidate_posts_cache()
             logger.info('Post updated: "%s" by %s', post.slug, self.request.user.email)
+            if (
+                post.status == Post.Status.PUBLISHED
+                and old_status != Post.Status.PUBLISHED
+            ):
+                _publish_post_sse_event(post)
         except Exception:
             logger.exception("Post update failed by %s", self.request.user.email)
             raise
@@ -229,6 +259,9 @@ class PostViewSet(viewsets.ModelViewSet):
                 author_email=request.user.email,
                 body=comment.body,
             )
+            from apps.notifications.tasks import process_new_comment_task
+
+            process_new_comment_task.delay(comment.id)
         except Exception:
             logger.exception('Comment creation failed on "%s"', post.slug)
             return Response(

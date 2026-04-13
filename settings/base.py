@@ -3,6 +3,7 @@ from settings.conf import (
     BLOG_ALLOWED_HOSTS,
     BLOG_SECRET_KEY,
     BLOG_REDIS_URL,
+    BLOG_CELERY_BROKER_URL,
 )
 from datetime import timedelta
 
@@ -12,6 +13,7 @@ ALLOWED_HOSTS = BLOG_ALLOWED_HOSTS
 AUTH_USER_MODEL = "users.User"
 
 INSTALLED_APPS = [
+    "daphne",
     "modeltranslation",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -22,9 +24,11 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_simplejwt",
     "drf_spectacular",
+    "channels",
     "apps.core",
     "apps.users",
     "apps.blog",
+    "apps.notifications",
 ]
 
 MIDDLEWARE = [
@@ -41,6 +45,7 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "settings.urls"
 WSGI_APPLICATION = "settings.wsgi.application"
+ASGI_APPLICATION = "settings.asgi.application"
 
 TEMPLATES = [
     {
@@ -132,6 +137,22 @@ CACHES = {
     },
 }
 
+CELERY_BROKER_URL = BLOG_CELERY_BROKER_URL
+CELERY_RESULT_BACKEND = BLOG_CELERY_BROKER_URL
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = "UTC"
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [BLOG_REDIS_URL],
+        },
+    },
+}
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -184,6 +205,11 @@ LOGGING = {
             "propagate": False,
         },
         "apps.core": {
+            "handlers": ["console", "file"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+        "apps.notifications": {
             "handlers": ["console", "file"],
             "level": "DEBUG",
             "propagate": False,
