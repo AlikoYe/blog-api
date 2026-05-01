@@ -20,8 +20,10 @@ venv/
 db.sqlite3
 
 media/
+staticfiles/
 
 .DS_Store
-Thumbs.db*.mo
-staticfiles/
+Thumbs.db
+
+*.mo
 settings/.env.docker

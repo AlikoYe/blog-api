@@ -3,37 +3,76 @@ services:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
 
+  init_data:
+    image: alpine:3.20
+    command: sh -c "mkdir -p /app/data /app/staticfiles /app/media && chmod -R 777 /app/data /app/staticfiles /app/media"
+    volumes:
+      - sqlite_data:/app/data
+      - static:/app/staticfiles
+      - media:/app/media
+
   web:
     build: .
     command: daphne -b 0.0.0.0 -p 8000 settings.asgi:application
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     volumes:
       - sqlite_data:/app/data
+      - static:/app/staticfiles
+      - media:/app/media
       - ./settings/.env:/app/settings/.env:ro
     environment:
       - BLOG_ENV_ID=local
+      - BLOG_DEBUG=False
       - BLOG_DATA_DIR=/app/data
+      - BLOG_REDIS_URL=redis://redis:6379/0
+      - BLOG_CELERY_BROKER_URL=redis://redis:6379/1
+      - BLOG_ALLOWED_HOSTS=localhost,127.0.0.1
+    restart: unless-stopped
     depends_on:
+      init_data:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - static:/var/www/static:ro
+      - media:/var/www/media:ro
+    restart: unless-stopped
+    depends_on:
+      - web
 
   celery_worker:
     build: .
     command: celery -A settings worker --loglevel=info
     volumes:
       - sqlite_data:/app/data
+      - static:/app/staticfiles
+      - media:/app/media
       - ./settings/.env:/app/settings/.env:ro
     environment:
       - BLOG_ENV_ID=local
+      - BLOG_DEBUG=False
       - BLOG_DATA_DIR=/app/data
+      - BLOG_REDIS_URL=redis://redis:6379/0
+      - BLOG_CELERY_BROKER_URL=redis://redis:6379/1
+      - BLOG_ALLOWED_HOSTS=localhost,127.0.0.1
+    restart: unless-stopped
     depends_on:
+      init_data:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
 
@@ -41,14 +80,23 @@ services:
     build: .
     command: celery -A settings beat --loglevel=info
     volumes:
-       - sqlite_data:/app/data
-       - ./settings/.env:/app/settings/.env:ro
+      - sqlite_data:/app/data
+      - static:/app/staticfiles
+      - media:/app/media
+      - ./settings/.env:/app/settings/.env:ro
     environment:
-       - BLOG_ENV_ID=local
-       - BLOG_DATA_DIR=/app/data
+      - BLOG_ENV_ID=local
+      - BLOG_DEBUG=False
+      - BLOG_DATA_DIR=/app/data
+      - BLOG_REDIS_URL=redis://redis:6379/0
+      - BLOG_CELERY_BROKER_URL=redis://redis:6379/1
+      - BLOG_ALLOWED_HOSTS=localhost,127.0.0.1
+    restart: unless-stopped
     depends_on:
+      init_data:
+        condition: service_completed_successfully
       redis:
-         condition: service_healthy
+        condition: service_healthy
 
   flower:
     build: .
@@ -59,9 +107,16 @@ services:
       - ./settings/.env:/app/settings/.env:ro
     environment:
       - BLOG_ENV_ID=local
+      - BLOG_DEBUG=False
+      - BLOG_REDIS_URL=redis://redis:6379/0
+      - BLOG_CELERY_BROKER_URL=redis://redis:6379/1
+      - BLOG_ALLOWED_HOSTS=localhost,127.0.0.1
+    restart: unless-stopped
     depends_on:
       redis:
         condition: service_healthy
 
 volumes:
   sqlite_data:
+  static:
+  media:
